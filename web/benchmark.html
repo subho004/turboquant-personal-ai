@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TurboVec vs FAISS · Benchmark</title>
+<style>
+  :root {
+    --bg:#0d1117; --panel:#161b22; --border:#2d333b; --text:#e6edf3;
+    --muted:#8b949e; --accent:#4493f8; --tv:#3fb950; --pq:#d29922; --flat:#8b949e;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); min-height:100vh;
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  .wrap { max-width:980px; margin:0 auto; padding:28px 24px; }
+  h1 { margin:0 0 4px; }
+  .sub { color:var(--muted); margin-bottom:20px; }
+  a { color:var(--accent); text-decoration:none; }
+  .controls { display:flex; gap:12px; align-items:center; background:var(--panel);
+    border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:20px; }
+  select, button { font:inherit; }
+  select { background:#1c232c; color:var(--text); border:1px solid var(--border);
+    border-radius:6px; padding:7px 10px; }
+  button { background:var(--accent); color:#fff; border:0; border-radius:6px;
+    padding:8px 16px; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+    gap:16px; margin-bottom:24px; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px; }
+  .card h3 { margin:0 0 12px; font-size:13px; color:var(--muted); text-transform:uppercase;
+    letter-spacing:.04em; }
+  .bar-row { display:flex; align-items:center; gap:10px; margin:8px 0; }
+  .bar-row .name { width:78px; font-size:12px; color:var(--muted); }
+  .bar-track { flex:1; background:#1c232c; border-radius:5px; height:22px; overflow:hidden; }
+  .bar { height:100%; border-radius:5px; display:flex; align-items:center;
+    justify-content:flex-end; padding-right:6px; font-size:11px; color:#0d1117; font-weight:600; }
+  table { width:100%; border-collapse:collapse; background:var(--panel);
+    border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  th, td { padding:10px 14px; text-align:left; border-bottom:1px solid var(--border); }
+  th { color:var(--muted); font-size:12px; text-transform:uppercase; }
+  tr:last-child td { border-bottom:0; }
+  .win { color:var(--tv); font-weight:600; }
+  .note { color:var(--muted); font-size:12px; margin-top:14px; }
+  .spinner { display:none; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>TurboVec vs FAISS</h1>
+  <div class="sub">Live benchmark on a synthetic corpus · <a href="/">← Back to chat</a></div>
+
+  <div class="controls">
+    <label>Corpus size</label>
+    <select id="size">
+      <option value="5000">5,000 vectors</option>
+      <option value="20000" selected>20,000 vectors</option>
+      <option value="50000">50,000 vectors</option>
+    </select>
+    <button id="run">Run benchmark</button>
+    <span class="spinner" id="spin">Running… building indexes & measuring</span>
+  </div>
+
+  <div id="results" style="display:none;">
+    <div class="grid">
+      <div class="card"><h3>Index size on disk (MB) — lower is better</h3><div id="sizeChart"></div></div>
+      <div class="card"><h3>Search latency p50 (ms) — lower is better</h3><div id="latChart"></div></div>
+      <div class="card"><h3>Recall@10 — higher is better</h3><div id="recallChart"></div></div>
+    </div>
+    <table>
+      <thead><tr><th>Index</th><th>Build (s)</th><th>p50 (ms)</th><th>p95 (ms)</th>
+        <th>Size (MB)</th><th>Compression</th><th>Recall@10</th><th>Training</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="note" id="note"></div>
+  </div>
+</div>
+
+<script>
+const COLORS = { "TurboVec (4-bit)":"#3fb950", "FAISS IndexPQ":"#d29922", "FAISS IndexFlat (exact)":"#8b949e" };
+const fmt = (v) => (v === null || v === undefined) ? "—" : v;
+
+function bars(elId, rows, key, unit) {
+  const el = document.getElementById(elId);
+  const vals = rows.map(r => r[key]).filter(v => v != null);
+  const max = Math.max(...vals, 0.0001);
+  el.innerHTML = "";
+  rows.forEach(r => {
+    const v = r[key];
+    const pct = v == null ? 0 : Math.max(4, (v / max) * 100);
+    el.insertAdjacentHTML("beforeend",
+      `<div class="bar-row"><span class="name">${r.name.split(" ")[0]}</span>
+       <div class="bar-track"><div class="bar" style="width:${pct}%;background:${COLORS[r.name]}">${v==null?"":fmt(v)+unit}</div></div></div>`);
+  });
+}
+
+document.getElementById("run").onclick = async () => {
+  const btn = document.getElementById("run");
+  const n = document.getElementById("size").value;
+  btn.disabled = true; document.getElementById("spin").style.display = "inline";
+  try {
+    const res = await fetch(`/api/v1/benchmark/run?n_vectors=${n}`, { method: "POST" });
+    const body = await res.json();
+    const data = body.data;
+    const rows = data.results;
+    bars("sizeChart", rows, "size_mb", "");
+    bars("latChart", rows, "p50_ms", "");
+    bars("recallChart", rows, "recall_at_k", "");
+
+    const tb = document.getElementById("tbody");
+    tb.innerHTML = "";
+    rows.forEach(r => {
+      const win = r.name.startsWith("TurboVec") ? "win" : "";
+      tb.insertAdjacentHTML("beforeend",
+        `<tr><td class="${win}">${r.name}</td><td>${fmt(r.build_s)}</td><td>${fmt(r.p50_ms)}</td>
+         <td>${fmt(r.p95_ms)}</td><td>${fmt(r.size_mb)}</td>
+         <td>${r.compression_x?r.compression_x+"×":"—"}</td><td>${fmt(r.recall_at_k)}</td>
+         <td>${r.needs_training?"required":"none"}</td></tr>`);
+    });
+    document.getElementById("note").textContent =
+      `FP32 baseline RAM: ${data.fp32_ram_mb} MB · ran in ${data.elapsed_s}s. ${data.note}`;
+    document.getElementById("results").style.display = "block";
+  } catch (e) {
+    alert("Benchmark failed: " + e.message);
+  } finally {
+    btn.disabled = false; document.getElementById("spin").style.display = "none";
+  }
+};
+</script>
+</body>
+</html>
