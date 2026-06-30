@@ -19,6 +19,15 @@ rewritten using history), with reloadable chat history and a live token/cost met
 
 ![Folder-scoped multi-turn chat](assets/02-folder-scoped-chat.png)
 
+**Second-brain queries.** "Summarise topic" pulls every relevant chunk across all
+folders into one cited summary:
+
+![Summarise a topic across documents](assets/04-summarise-topic.png)
+
+"Which files mention…" runs a corpus-wide FTS5 lookup and ranks files by hit count:
+
+![Which files mention a term](assets/05-which-files-mention.png)
+
 Built-in benchmark dashboard — TurboVec vs FAISS on a synthetic corpus (index size,
 latency, recall, compression):
 
