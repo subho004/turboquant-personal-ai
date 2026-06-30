@@ -7,6 +7,25 @@
 
 Built on **Python 3.14.2** + [`uv`](https://docs.astral.sh/uv/) · FastAPI · SQLAlchemy (async SQLite) · TurboVec · FAISS · OpenAI.
 
+## Demo
+
+Grounded chat over a folder of indexed documents, with inline `[S1]` citations and
+clickable source chips that open the exact file:
+
+![Grounded RAG chat with citations](assets/01-chat-citations.png)
+
+Follow-up–aware, folder-scoped answers ("And what's the home-office stipend?" is
+rewritten using history), with reloadable chat history and a live token/cost meter:
+
+![Folder-scoped multi-turn chat](assets/02-folder-scoped-chat.png)
+
+Built-in benchmark dashboard — TurboVec vs FAISS on a synthetic corpus (index size,
+latency, recall, compression):
+
+![TurboVec vs FAISS benchmark](assets/03-benchmark.png)
+
+> Screenshots were captured live against the running app. The documents shown are two
+> public arXiv papers plus a set of anonymized sample notes for a fictional company.
 
 ## Features
 
